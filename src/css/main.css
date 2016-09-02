@@ -1,0 +1,9 @@
+a.navbar-brand {
+	padding: 0;
+}
+img.navbar-brand-logo {
+	box-sizing: border-box;
+    width: auto;
+    min-height: 100%;
+    margin: 0 15px;
+}
