@@ -2,14 +2,14 @@ var navbar = {
 	selector: 'navbar',
 	items: {
 		home: {
-			name: 'Home',
+			title: 'Home',
 			href: '#',
-			usersAction: 'close'
+			action: 'home'
 		},
 		users: {
-			name: 'Users',
+			title: 'Users',
 			href: '#users',
-			usersAction: 'list'
+			action: 'list'
 		}
 	},
 	active: 'home'
@@ -36,19 +36,27 @@ navbar.state.representation = function(model, display) {
 
 //
 navbar.view = function(model) {
-	return $(`<ul id="repr-${model.selector}" class="nav navbar-nav"></ul>`).append(
-		$.map(model.items, function(nav, key) {
-			let el = $(`<li><a href="${nav.href}">${nav.name}</a></li>`)
-			if (key == model.active) {
-				el.addClass('active')
+	let repr = $(`<ul id="repr-${model.selector}" class="nav navbar-nav"></ul>`)
+
+	let items = $.map(model.items, function(nav, key) {
+		let el = $(`<li><a href="${nav.href}" data-active="${key}">${nav.title}</a></li>`)
+
+		if (key == model.active) {
+			el.addClass('active')
+		}
+		el.on('click', function(ev) {
+			if ('action' in nav) {
+				// TODO: holly shit
+				models[key].actions[nav.action](ev, models[key].present)
 			}
-			el.on('click', { active: key }, function(ev) {
-				model.actions.navigateTo(ev.data, model.present)
-				users.actions[nav.usersAction]({ active: nav.usersAction }, users.present)
-			})
-			return el
+			model.actions.navigateTo(ev, model.present)
 		})
-	)
+		return el
+	})
+
+	repr.append(items)
+
+	return repr
 }
 navbar.view.display = function(selector, repr) {
 	$(selector).replaceWith(repr)
@@ -56,10 +64,15 @@ navbar.view.display = function(selector, repr) {
 
 //
 navbar.actions = {}
-navbar.actions.navigateTo = function(data, present) {
-	present(data, navbar.state.render)
+navbar.actions.navigateTo = function(ev, present) {
+	let active = $(ev.target).data('active')
+	present({ active: active }, navbar.state.render)
 }
+
+var models = models || {}
+models.navbar = navbar
 
 $(function() {
 	navbar.view.display(`#repr-${navbar.selector}`, navbar.view(navbar))
 })
+

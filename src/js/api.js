@@ -43,9 +43,10 @@ function Endpoint(uri) {
 	}
 	this._throwForResult = function(res) {
 		if (res.result === 'Error') {
+			// TODO: shit
 			let { type, args } = res.error
-			args = args.join(' ')
-			let msg = `${type}: ${args}`
+			args = args.map(arg => `  ${arg}`).join('\n')
+			let msg = `${type}:\n${args}`
 			throw new APIError(msg, error.stack_trace.join(''))
 		} else {
 			return res
@@ -62,7 +63,7 @@ function Endpoint(uri) {
 				.then(this._throwForStatus)
 				.then(this._parseJSON)
 				.then(this._throwForResult)
-				.then(this._extractData)
+				// .then(this._extractData)
 	}
 	this.get = function(params, headers) {
 		return this._perform(params, { headers: headers })
@@ -84,6 +85,7 @@ function API(baseURI) {
 }
 
 ;(function() {
+	// TODO
 	this.endpoin = function(basePath) {
 		return function(additionalPath) {
 			let uri = new URL(this.baseURI)
@@ -94,13 +96,22 @@ function API(baseURI) {
 			}
 
 			uri.pathname = joinPath(...path)
-			return new Endpoint(uri)
+			let users = new Endpoint(uri)
+
+			path.push('extra')
+			let extraURI = new URL(uri)
+			extraURI.pathname = joinPath(...path)
+			users.extra = new Endpoint(extraURI)
+
+			return users
 		}
 	}
 }).call(API.prototype)
 
-var api = new API('http://localhost:8090')
+// var api = new API('http://localhost:8090')
+var api = new API('http://api.aws.toprater.io')
 
 api.users = api.endpoin('/users')
+
 
 // export default api

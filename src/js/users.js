@@ -1,214 +1,409 @@
 // V = S( vm( M.present( A(data) ) ), nap(M))
 
 var users = {
-	selector: 'main',
-	states: ['norender', 'close', 'list', 'new', 'create', 'edit', 'update'],
-	active: 'list', // initial
-	items: {},
-	id: null
+    selector: 'main',
+    pages: ['list', 'new', 'create', 'edit', 'update'],
+    page: 'list'
 }
 users.present = function(data, render) {
-	let { active } = data
+    let { page } = data
 
-	if (users.states.includes(active)) {
-		users.active = active
-	}
+    if (users.pages.includes(page)) {
+        users.page = page
+    }
 
-	if ('items' in data) {
-		users.items = data.items
-	}
+    // accept
+    if ('items' in data) {
+        users.items = data.items
+    }
 
-	if ('id' in data) {
-		users.id = data.id
-	}
+    if ('id' in data) {
+        users.id = data.id
+    }
 
-	if ('alert' in data) {
-		users.alert = data.alert
-	}
+    if ('user' in data) {
+        users.user = data.user
+    }
 
-	if (users.active == 'update') {
-		api.users(users.id).post(data.user)
-			.then(function(res) {
-				users.active = 'edit'
-				users.items[users.id] = res
-				
-				users.alert = {
-					kind: 'success',
-					message: '<strong>Well done!</strong> User updated successfully'
-				}
-				render(users)
-			})
-	} else {
-		render(users)
-	}
+    // autoreset
+    if ('alert' in data) {
+        users.alert = data.alert
+    } else {
+        delete users.alert
+    }
+
+    if (users.page == 'update') {
+        api.users(users.id).post(users.user)
+            .then(function(res) {
+                users.page = 'edit'
+                users.items[users.id] = res.data
+                
+                users.alert = {
+                    kind: 'success',
+                    message: '<strong>Well done!</strong> User updated successfully'
+                }
+                render(users)
+            })
+            .catch(function(err) {
+                console.log(err.message)
+                users.page = 'edit'
+
+                users.alert = {
+                    kind: 'danger',
+                    message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+                }
+            })
+    } else if (users.page == 'create') {
+        api.users().post({ login_pass: users.user })
+            .then(function(res) {
+                users.page = 'edit'
+                users.id = res.data.id
+
+                if (users.user.extra) {
+                    api.users(users.id).extra.post({ data: users.user.extra }) // TODO: shit
+                        .then(function(res) {
+                            users.items[users.id] = res.data
+
+                            users.alert = {
+                                kind: 'success',
+                                message: '<strong>Well done!</strong> User created successfully'
+                            }
+                            render(users)
+                        })
+                        .catch(function(err) {
+                            console.log(err.message)
+                            users.page = 'new'
+
+                            users.alert = {
+                                kind: 'danger',
+                                message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+                            }
+                            render(users)
+                        })
+                } else {
+                    users.items[users.id] = res.data
+
+                    users.alert = {
+                        kind: 'success',
+                        message: '<strong>Well done!</strong> User created successfully'
+                    }
+
+                    render(users)
+                }
+            })
+            .catch(function(err) {
+                console.log(err.message)
+                users.page = 'new'
+
+                users.alert = {
+                    kind: 'danger',
+                    message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+                }
+                render(users)
+            })
+    } else {
+        render(users)
+    }
 }
 
 // state
 users.state = {}
 users.state.render = function(model) {
-	model.state.representation(model, model.views.display)
-	users.state.nextAction(model)
+    model.state.representation(model, model.views.display)
+    // model.state.nextAction(model)
 }
 users.state.representation = function(model, display) {
-	if (model.active == 'norender') {
-		// pass
-	} else {
-		let repr = model.views[model.active](model) // TODO: clean this crap
-		display(`#repr-${model.selector}`, repr)
-	}
+    let repr = model.views[model.page](model) // TODO: clean this crap
+
+    if (model.alert) {
+        repr.prepend(alert.view(model))
+    }
+    // TODO: alerts (independent model?)
+    display(`#repr-${model.selector}`, repr)
 }
 users.state.nextAction = function(model) {
-	// is there any automatic action to which we can transit?
-	if (model.alert) {
-		model.actions.clearAlert({ active: 'norender', alert: null }, model.present)
-	}
+    // is there any automatic action to which we can transit?
 }
 
 // view
 users.views = {}
 users.views.display = function(selector, repr) {
-	$(selector).replaceWith(repr)
-}
-users.views.close = function(model) {
-	return $(`<div id="repr-${model.selector}"></div>`)
+    $(selector).replaceWith(repr)
 }
 users.views.list = function(model) {
-	let repr = $(
-		`<div id="repr-${model.selector}" class="row">
-			<div class="col-md-12">
-				<table class="table table-striped table-hover">
-					<thead>
-						<tr>
-							<th>First Name</th>
-							<th>Last Name</th>
-							<th>Label</th>
-						</tr>
-					</thead>
-					<tbody></tbody>
-				</table>
-			</div>
-		</div>`
-	)
+    let repr = $(
+        `<div id="repr-${model.selector}" class="row">
+            <button class="btn btn-primary pull-right" type="button">
+                <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
+                Create user
+            </button>
+            <div class="col-md-12">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>##</th>
+                            <th>First Name</th>
+                            <th>Last Name</th>
+                            <th>Label</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>`
+    )
 
-	let items = $.map(model.items, function(user, id) {
-		let el = $(
-			`<tr>
-				<td>${user.first_name}</td>
-				<td>${user.last_name}</td>
-				<td>${user.label}</td>
-			</tr>`
-		)
-		el.on('click', { active: 'edit', id: id }, function(ev) {
-			model.actions.edit(ev.data, model.present)
-		})
-		return el
-	})
+    repr.find('button').on('click', function(ev) {
+        model.actions.new(ev, model.present)
+    })
 
-	repr.find('tbody').append(items)
+    let items = $.map(model.items, function(user, id) {
+        let el = $(
+            `<tr>
+                <td></td>
+                <td>${user.first_name || ''}</td>
+                <td>${user.last_name || ''}</td>
+                <td>${user.label || ''}</td>
+            </tr>`
+        )
+        el.on('click', { id: id }, function(ev) {
+            model.actions.edit(ev, model.present)
+        })
+        return el
+    })
 
-	return repr
+    repr.find('tbody').append(items)
+
+    // let pager = model.views.partials.pagination(model.pagination)
+
+    return repr
+}
+users.views.new = function(model) {
+    let repr = $(
+        `<div id="repr-${model.selector}" class="form-horizontal">
+            <div class="page-header">
+                <h1>Creating User</h1>
+            </div>
+        </div>`
+    )
+
+    let form = model.views.partials.form(model.user)
+    
+    form.prepend(
+        `<div class="form-group">
+            <label class="control-label col-md-2" for="">Login</label>
+            <div class="col-md-8">
+                <input type="text" class="form-control" name="login" value="${model.user.login || ''}"/>
+            </div>
+        </div>`
+    )
+    
+    form.find('button[data-action="cancel"]').on('click', function(ev) {
+        model.actions.list(ev, model.present)
+    })
+
+    form.on('submit', function(ev) {
+        ev.preventDefault()
+        model.actions.create(ev, model.present)
+    })
+
+    repr.append(form)
+
+    return repr
 }
 users.views.edit = function(model) {
-	let user = model.items[model.id]
+    let repr = $(
+        `<div id="repr-${model.selector}" class="form-horizontal">
+            <div class="page-header">
+                <h1>Changing User</h1>
+            </div>
+        </div>`
+    )
 
-	let repr = $(
-		`<div id="repr-${model.selector}" class="form-horizontal">
-			<div class="page-header">
-				<h1>Changing User</h1>
-			</div>
-			<form>
-				<div class="form-group">
-					<label class="control-label col-md-2" for="">First name</label>
-					<div class="col-md-8">
-						<input type="text" class="form-control" name="first_name" value="${user.first_name}"/>
-					</div>
-				</div>
-				<div class="form-group">
-					<label class="control-label col-md-2" for="">Last name</label>
-					<div class="col-md-8">
-						<input type="text" class="form-control" name="last_name" value="${user.last_name}"/>
-					</div>
-				</div>
-				<div class="form-group">
-					<label class="control-label col-md-2" for="">Label</label>
-					<div class="col-md-8">
-						<input type="text" class="form-control" name="label" value="${user.label}"/>
-					</div>
-				</div>
-				<div class="form-group">
-					<div class="col-md-offset-2 col-md-8">
-						<button type="submit" class="btn btn-default">Save</button>
-					</div>
-				</div>
-			</form>
-		</div>`
-	)
+    let user = model.items[model.id]
+    let form = model.views.partials.form(user)
 
-	// alert
-	if (model.alert) {
-		let al = $(
-			`<div class="alert alert-${model.alert.kind} alert-dismissable" role="alert">
-				<button type="button" class="close" data-dismiss="alert" aria-label="Close">
-					<span aria-hidden="true">&times;</span>
-				</button>
-				${model.alert.message}
-			</div>`)
-		repr.prepend(al)
-	}
+    form.find('button[data-action="cancel"]').on('click', function(ev) {
+        model.actions.list(ev, model.present)
+    })
 
-	let cancel = $('<button type="button" class="btn btn-danger">Cancel</button>')
-	cancel.on('click', { active: 'list' }, function(ev) {
-		model.actions.list(ev.data, model.present)
-	})
-	repr.find('.form-group:last-child').find('div').append(cancel)
+    form.on('submit', function(ev) {
+        ev.preventDefault()
+        model.actions.update(ev, model.present)
+    })
 
-	repr.find('form').on('submit', { active: 'update', id: model.id }, function(ev) {
-		ev.preventDefault()
-		ev.data.form = ev.target
-		model.actions.update(ev.data, model.present)
-	})
+    repr.append(form)
 
-	return repr
+    return repr
+}
+
+users.views.partials = {}
+users.views.partials.form = function(user) {
+    return $(
+        `<form>
+            <div class="form-group">
+                <label class="control-label col-md-2" for="">First name</label>
+                <div class="col-md-8">
+                    <input type="text" class="form-control" name="first_name" value="${user.first_name || ''}"/>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="control-label col-md-2" for="">Last name</label>
+                <div class="col-md-8">
+                    <input type="text" class="form-control" name="last_name" value="${user.last_name || ''}"/>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="control-label col-md-2" for="">Label</label>
+                <div class="col-md-8">
+                    <input type="text" class="form-control" name="label" value="${user.label || ''}"/>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="checkbox col-md-8 col-md-offset-2">
+                    <label>
+                        <input type="hidden" name="celebrity" value="false"/>
+                        <input type="checkbox" name="celebrity" value="true" ${user.extra && user.extra.features && user.extra.features.celebrity ? "checked" : ""}/>
+                        Celebrity
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="checkbox col-md-8 col-md-offset-2">
+                    <label>
+                        <input type="hidden" name="expert" value="false"/>
+                        <input type="checkbox" name="expert" value="true" ${user.extra && user.extra.features && user.extra.features.expert ? "checked" : ""}/>
+                        Expert
+                    </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-md-offset-2 col-md-8">
+                    <button type="submit" class="btn btn-default">Save</button>
+                    <button type="button" class="btn btn-danger" data-action="cancel">Cancel</button>
+                </div>
+            </div>
+        </form>`
+    )
+}
+
+// users.views.partials.pagination = function(pagination) {
+//     let pager = $(
+//         `<nav aria-label="Page navigation">
+//             <ul class="pagination">
+//             </ul>
+//         </nav>`
+//     )
+
+//     let pages = Math.ceil(pagination.total / pagination.per)
+
+//     for (let i = 1; i <= pages; i++) {
+//         let p = $(`<li><a href="#">${i}</a></li>`)
+//         if (i == pagination.current) {
+//             p.addClass('active')
+//         }
+//         pager.find('ul').append(p)
+//     }
+
+//     return pager
+// }
+
+// data = action(event)
+users.actions = {}
+users.actions.list = function(ev, present) {
+    let data = {
+        page: 'list'
+    }
+    api.users().get({ template: 'sys', limit: 99999 }) // filter: 'celebrity', 
+        .then(function(res) {
+            // NO:
+            // data.items = {}
+            // what if respense is empty?
+            let items = {}
+            for (let e of res.data) {
+                items[e.id] = e
+            }
+            // OK:
+            data.items = items
+            // we must set data properties if and only if there is a real value for it
+            present(data, users.state.render)
+        })
+        .catch(function(err) {
+            console.log(err.message)
+            // OK:
+            data.alert = {
+            // data.alert guaranteed has value
+                kind: 'danger',
+                message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+            }
+            present(data, users.state.render)
+        })
+}
+users.actions.new = function(ev, present) {
+    let data = {
+        page: 'new',
+        user: {} // OK: user must be an object for `new`
+    }
+    present(data, users.state.render)
+}
+users.actions.create = function(ev, present) {
+    let data = {
+        page: 'create',
+        user: {}
+    }
+    let form = ev.target
+    for (let [k, v] of new FormData(form).entries()) {
+        if (['celebrity', 'expert'].includes(k)) {
+            // TODO: hooooooly shit...
+            data.user.extra = data.user.extra || {}
+            data.user.extra.features = data.user.extra.features || {}
+            data.user.extra.features[k] = v
+        } else {
+            data.user[k] = v
+        }
+    }
+    present(data, users.state.render)
+}
+users.actions.edit = function(ev, present) {
+    let data = {
+        page: 'edit',
+        id: ev.data.id
+    }
+    present(data, users.state.render)
+}
+users.actions.update = function(ev, present) {
+    let data = {
+        page: 'update',
+        user: {}
+    }
+    let form = ev.target
+    for (let [k, v] of new FormData(form).entries()) {
+        if (['celebrity', 'expert'].includes(k)) {
+            // TODO: hooooooly shit...
+            data.user.extra = data.user.extra || {}
+            data.user.extra.features = data.user.extra.features || {}
+            data.user.extra.features[k] = v
+        } else {
+            data.user[k] = v
+        }
+    }
+    present(data, users.state.render)
 }
 
 //
-users.actions = {}
-users.actions.close = function(data, present) {
-	present(data, users.state.render)
+var alert = {}
+alert.view = function(model) {
+    return $(
+        // `<div class="row">
+            `<div class="alert alert-${model.alert.kind} alert-dismissable role="alert">
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                ${model.alert.message}
+            </div>`
+        // </div>`
+    )
 }
-users.actions.list = function(data, present) {
-	data.id = null
-	api.users().get() // { filter: 'celebrity' })
-		.then(function(res) {
-			let items = {}
-			for (let e of res) {
-				items[e.id] = e
-			}
-			data.items = items
-			present(data, users.state.render)
-		})
-		.catch(function(reason) {
-			console.log(reason)
-			present(data, users.state.render)
-		})
-}
-users.actions.new = function(data, present) {
-	data.user = {}
-	for (let [k, v] of new FormData(data.form).entries()) {
-		data.user[k] = v
-	}
-	present(data, users.state.render)
-}
-users.actions.edit = function(data, present) {
-	present(data, users.state.render)
-}
-users.actions.update = function(data, present) {
-	data.user = {}
-	for (let [k, v] of new FormData(data.form).entries()) {
-		data.user[k] = v
-	}
-	present(data, users.state.render)
-}
-users.actions.clearAlert = function(data, present) {
-	present(data, users.state.render)
-}
+
+var models = models || {}
+models.users = users

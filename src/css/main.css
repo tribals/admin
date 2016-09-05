@@ -7,3 +7,18 @@ img.navbar-brand-logo {
     min-height: 100%;
     margin: 0 15px;
 }
+table.table tbody tr {
+	cursor: pointer;
+}
+table.table tbody {
+    counter-reset: rowNumber;
+}
+
+table.table tbody tr {
+    counter-increment: rowNumber;
+}
+
+table.table tbody tr td:first-child::before {
+    content: counter(rowNumber);
+    min-width: 1em;
+}
