@@ -34,9 +34,9 @@ users.present = function(data, render) {
 
     if (users.page == 'update') {
         api.users(users.id).post(users.user)
-            .then(function(res) {
+            .then(function(resp) {
                 users.page = 'edit'
-                users.items[users.id] = res.data
+                users.items[users.id] = resp.data
                 
                 users.alert = {
                     kind: 'success',
@@ -55,14 +55,14 @@ users.present = function(data, render) {
             })
     } else if (users.page == 'create') {
         api.users().post({ login_pass: users.user })
-            .then(function(res) {
+            .then(function(resp) {
                 users.page = 'edit'
-                users.id = res.data.id
+                users.id = resp.data.id
 
                 if (users.user.extra) {
-                    api.users(users.id).extra.post({ data: users.user.extra }) // TODO: shit
-                        .then(function(res) {
-                            users.items[users.id] = res.data
+                    api.users(users.id).extra().post({ data: users.user.extra }) // TODO: shit
+                        .then(function(resp) {
+                            users.items[users.id] = resp.data
 
                             users.alert = {
                                 kind: 'success',
@@ -81,7 +81,7 @@ users.present = function(data, render) {
                             render(users)
                         })
                 } else {
-                    users.items[users.id] = res.data
+                    users.items[users.id] = resp.data
 
                     users.alert = {
                         kind: 'success',
@@ -135,7 +135,7 @@ users.views.list = function(model) {
         `<div id="repr-${model.selector}" class="row">
             <button class="btn btn-primary pull-right" type="button">
                 <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>
-                Create user
+                Create <strong>User</strong>
             </button>
             <div class="col-md-12">
                 <table class="table table-striped table-hover">
@@ -215,13 +215,22 @@ users.views.edit = function(model) {
     let repr = $(
         `<div id="repr-${model.selector}" class="form-horizontal">
             <div class="page-header">
-                <h1>Changing User</h1>
+                <h1>Changing <strong>User</strong></h1>
             </div>
         </div>`
     )
 
     let user = model.items[model.id]
     let form = model.views.partials.form(user)
+
+    form.prepend(
+        `<div class="form-group">
+            <label class="control-label col-md-2" for="">ID</label>
+            <div class="col-md-8">
+                <input type="text" class="form-control" name="id" value="${model.id || ''}" readonly/>
+            </div>
+        </div>`
+    )
 
     form.find('button[data-action="cancel"]').on('click', function(ev) {
         model.actions.list(ev, model.present)
@@ -315,12 +324,12 @@ users.actions.list = function(ev, present) {
         page: 'list'
     }
     api.users().get({ template: 'sys', limit: 99999 }) // filter: 'celebrity', 
-        .then(function(res) {
+        .then(function(resp) {
             // NO:
             // data.items = {}
             // what if respense is empty?
             let items = {}
-            for (let e of res.data) {
+            for (let e of resp.data) {
                 items[e.id] = e
             }
             // OK:
