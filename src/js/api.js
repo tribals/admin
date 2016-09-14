@@ -1,4 +1,66 @@
-//
+// library
+function Endpoint(uri) {
+	this.uri = uri
+}
+;(function() {
+	// stable
+	this.shim = function(path) {
+		if (path) {
+			let uri = new URL(this.uri) // something like clone, because URL is mutable
+			uri.pathname = pathlib.join(uri.pathname, path)
+			return new EndpointProxy(uri)
+		} else {
+			return this
+		}
+	}
+	this.get = function(params, headers) {
+		return this._perform(params, { headers: headers })
+	}
+	this.post = function(body, params, headers) {
+		// TODO: shit
+		// TOOODOOO: need to clean internal api
+		body = JSON.stringify(body || {})
+
+		headers = new Headers(headers || {})
+		headers.append('content-type', 'application/json')
+
+		return this._perform(params, { method: 'post', headers: headers, body: body })
+	}
+	// semi-stable
+	this._perform = function(params, reqParams) {
+		reqParams.mode = 'cors'
+		let req = new Request(this._buildURI(params), reqParams)
+
+		return fetch(req)
+				.then(this._throwForStatus)
+				.then(this._parseJSON)
+				.then(this._throwForResult)
+				// .then(this._extractData)
+	}
+}).call(Endpoint.prototype)
+
+function EndpointProxy(uri) {
+	let endpoint = new Endpoint(uri)
+
+	return new Proxy(endpoint, {
+		get(target, prop) {
+			if (Reflect.has(target, prop)) {
+				return Reflect.get(target, prop)
+			} else {
+				// i'm a variable names nazi
+				[parent, path] = [target, prop]
+				let uri = new URL(parent.uri)
+				uri.pathname = pathlib.join(uri.pathname, path)
+
+				let proxy = EndpointProxy(uri)
+
+				return proxy.shim.bind(proxy)
+			}
+		}
+	})
+}
+
+// domain-specific, must not be part of library
 var defaultData = {
 	// null object
 	result: 'Ok',
@@ -10,14 +72,11 @@ function APIError(message, stackTrace) {
 	this.message = message
 	this.originalStackTrace = stackTrace
 }
-
+// or just `proto = proto`?
 APIError.prototype = Object.create(Error.prototype)
 
-function Endpoint(uri) {
-	this.uri = uri
-}
-
 ;(function() {
+	// unstable, just list of additional callbacks for success request
 	this._buildURI = function(params) {
 		let uri = new URL(this.uri)
 
@@ -55,63 +114,9 @@ function Endpoint(uri) {
 	this._extractData = function(res) {
 		return res.data
 	}
-	this._perform = function(params, reqParams) {
-		reqParams.mode = 'cors'
-		let req = new Request(this._buildURI(params), reqParams)
-
-		return fetch(req)
-				.then(this._throwForStatus)
-				.then(this._parseJSON)
-				.then(this._throwForResult)
-				// .then(this._extractData)
-	}
-	this.get = function(params, headers) {
-		return this._perform(params, { headers: headers })
-	}
-	this.post = function(body, params, headers) {
-		// TODO: shit
-		// TOOODOOO: need to clean internal api
-		body = JSON.stringify(body || {})
-
-		headers = new Headers(headers || {})
-		headers.append('content-type', 'application/json')
-
-		return this._perform(params, { method: 'post', headers: headers, body: body })
-	}
 }).call(Endpoint.prototype)
 
-function API(baseURI) {
-	this.baseURI = baseURI
-}
-
-;(function() {
-	// TODO
-	this.endpoin = function(basePath) {
-		return function(additionalPath) {
-			let uri = new URL(this.baseURI)
-			let path = [uri.pathname, basePath]
-
-			if (additionalPath) {
-				path.push(additionalPath)
-			}
-
-			uri.pathname = joinPath(...path)
-			let users = new Endpoint(uri)
-
-			path.push('extra')
-			let extraURI = new URL(uri)
-			extraURI.pathname = joinPath(...path)
-			users.extra = new Endpoint(extraURI)
-
-			return users
-		}
-	}
-}).call(API.prototype)
-
-// var api = new API('http://localhost:8090')
-var api = new API('http://api.aws.toprater.io')
-
-api.users = api.endpoin('/users')
-
+// var api = new EndpointProxy(new URL('http://localhost:8090'))
+var api = new EndpointProxy(new URL('http://api.aws.toprater.io'))
 
 // export default api
