@@ -33,16 +33,38 @@ users.present = function(data, render) {
     }
 
     if (users.page == 'update') {
-        api.users(users.id).post(users.user)
+        api.users(users.id).post(users.user, { template: 'sys' })
             .then(function(resp) {
                 users.page = 'edit'
-                users.items[users.id] = resp.data
-                
-                users.alert = {
-                    kind: 'success',
-                    message: '<strong>Well done!</strong> User updated successfully'
+
+                if (users.user.extra) {
+                    api.users(users.id).extra().post({ data: users.user.extra }, { template: 'sys' }) // TODO: shit
+                        .then(function(resp) {
+                            users.items[users.id] = resp.data
+
+                            users.alert = {
+                                kind: 'success',
+                                message: '<strong>Well done!</strong> User updated successfully'
+                            }
+                            render(users)
+                        })
+                        .catch(function(err) {
+                            console.log(err.message)
+                            users.alert = {
+                                kind: 'danger',
+                                message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+                            }
+                            render(users)
+                        })
+                } else {
+                    users.items[users.id] = resp.data
+
+                    users.alert = {
+                        kind: 'success',
+                        message: '<strong>Well done!</strong> User updated successfully'
+                    }
+                    render(users)
                 }
-                render(users)
             })
             .catch(function(err) {
                 console.log(err.message)
@@ -55,13 +77,13 @@ users.present = function(data, render) {
                 render(users)
             })
     } else if (users.page == 'create') {
-        api.users().post({ login_pass: users.user })
+        api.users().post({ login_pass: users.user }, { template: 'sys' })
             .then(function(resp) {
                 users.page = 'edit'
                 users.id = resp.data.id
 
                 if (users.user.extra) {
-                    api.users(users.id).extra().post({ data: users.user.extra }) // TODO: shit
+                    api.users(users.id).extra().post({ data: users.user.extra }, { template: 'sys' }) // TODO: shit
                         .then(function(resp) {
                             users.items[users.id] = resp.data
 
@@ -428,7 +450,7 @@ users.actions.update = function(ev, present) {
             // TODO: hooooooly shit...
             data.user.extra = data.user.extra || {}
             data.user.extra.features = data.user.extra.features || {}
-            data.user.extra.features[k] = v
+            data.user.extra.features[k] = eval(v) // HACK
         } else {
             data.user[k] = v
         }
