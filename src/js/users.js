@@ -52,6 +52,7 @@ users.present = function(data, render) {
                     kind: 'danger',
                     message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
                 }
+                render(users)
             })
     } else if (users.page == 'create') {
         api.users().post({ login_pass: users.user })
@@ -227,13 +228,36 @@ users.views.edit = function(model) {
         `<div class="form-group">
             <label class="control-label col-md-2" for="">ID</label>
             <div class="col-md-8">
-                <input type="text" class="form-control" name="id" value="${model.id || ''}" readonly/>
+                <input type="text" class="form-control" name="id" value="${user.id || ''}" disabled/>
             </div>
         </div>`
     )
 
+    if (user.main_image_hash) {
+        form.prepend(
+            `<div class="form-group">
+                <div class="col-md-offset-6 col-md-4">
+                    <img src="${picserv.uri(user.main_image_hash)}" alt="" class="img-responsive pull-right" />
+                </div>
+            </div>`
+        )
+    }
+
     form.find('button[data-action="cancel"]').on('click', function(ev) {
         model.actions.list(ev, model.present)
+    })
+
+    form.find('input[type="file"]').on('change', function(ev) {
+        let files = ev.target.files
+
+        if (files.length) {
+            let rd = new FileReader()
+            rd.onload = function(pev) {
+                // TODO: hooooly shit... depends on position of html element in DOM tree
+                $(ev.target).next().val(pev.target.result)
+            }
+            rd.readAsDataURL(files[0])
+        }
     })
 
     form.on('submit', function(ev) {
@@ -250,6 +274,13 @@ users.views.partials = {}
 users.views.partials.form = function(user) {
     return $(
         `<form>
+            <div class="form-group">
+                <label class="control-label col-md-2" for="">Main image</label>
+                <div class="col-md-8">
+                    <input type="file" class="form-control" accept="image/*" />
+                    <input type="hidden" name="main_image_file" />
+                </div>
+            </div>
             <div class="form-group">
                 <label class="control-label col-md-2" for="">First name</label>
                 <div class="col-md-8">
@@ -323,7 +354,7 @@ users.actions.list = function(ev, present) {
     let data = {
         page: 'list'
     }
-    api.users().get({ template: 'sys', limit: 99999 }) // filter: 'celebrity', 
+    api.users().get({ template: 'sys', limit: 9999 }) // filter: 'celebrity', 
         .then(function(resp) {
             // NO:
             // data.items = {}
@@ -396,7 +427,18 @@ users.actions.update = function(ev, present) {
             data.user[k] = v
         }
     }
-    present(data, users.state.render)
+
+    if (data.user.main_image_file) {
+        picserv.upload(data.user.main_image_file)
+            .then(function(resp) {
+                data.user.main_image_hash = resp.hash
+                present(data, users.state.render)
+            })
+            .catch(function(err) {
+                console.log(err)
+                present(data, users.state.render)
+            })
+    }
 }
 
 //
