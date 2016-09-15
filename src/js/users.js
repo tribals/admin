@@ -444,6 +444,8 @@ users.actions.update = function(ev, present) {
                 console.log(err)
                 present(data, users.state.render)
             })
+    } else {
+        present(data, users.state.render)
     }
 }
 
