@@ -146,6 +146,8 @@ users.views.list = function(model) {
                             <th>First Name</th>
                             <th>Last Name</th>
                             <th>Label</th>
+                            <th>Celebrity</th>
+                            <th>Expert</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -159,12 +161,16 @@ users.views.list = function(model) {
     })
 
     let items = $.map(model.items, function(user, id) {
+        let celebrity = user.extra && user.extra.features && user.extra.features.celebrity
+        let expert = user.extra && user.extra.features && user.extra.features.expert
         let el = $(
             `<tr>
                 <td></td>
                 <td>${user.first_name || ''}</td>
                 <td>${user.last_name || ''}</td>
                 <td>${user.label || ''}</td>
+                <td>${celebrity ? '<span class="glyphicon glyphicon-star"></span>' : ''}</td>
+                <td>${expert ? '<span class="glyphicon glyphicon-education"></span>' : ''}</td>
             </tr>`
         )
         el.on('click', { id: id }, function(ev) {
