@@ -32,7 +32,7 @@ cities.present = function(data, render) {
     }
 
     if (cities.page === 'create') {
-        api.spheres('cities').objects().post(cities.city, { template: 'sys' })
+        api.spheres('cities').objects().post(cities.city, { fields: 'name' })
             .then(function(resp) {
                 cities.page = 'edit'
                 cities.id = resp.data.id
@@ -61,7 +61,38 @@ cities.present = function(data, render) {
         render(cities)
     }
 }
+cities.parse = function(form) {
+    let city = {}
 
+    for (let [k, v] of new FormData(form).entries()) {
+        if (k.includes('.')) {
+            // TODO: THIS IS GOVNISHE!111
+            // handle keys
+            let [first, ...rest] = k.split('.')
+            let acc = city[first] || {}
+            city[first] = acc
+
+            while (rest.length > 1) {
+                let prop = rest.shift()
+                acc = acc[prop] = acc[prop] || {}
+            }
+
+            // handle val
+            let last = rest.shift() // really last
+
+            if (['lat', 'lng'].includes(last)) {
+                acc[last] = Number.parseFloat(v)
+            } else if (last === '@pcities_population') {
+                acc[last] = Number.parseInt(v)
+            } else {
+                acc[last] = v
+            }
+        } else {
+            data.city[k] = v
+        }
+    }
+    return city
+}
 // S
 cities.state = {}
 cities.state.render = function(model) {
@@ -338,36 +369,8 @@ cities.actions.create = function(ev, present) {
         page: 'create',
         city: {}
     }
-    // make request body
     let form = ev.target
-    for (let [k, v] of new FormData(form).entries()) {
-        if (k.includes('.')) {
-            // TODO: THIS IS GOVNISHE!111
-            // handle keys
-            let [first, ...rest] = k.split('.')
-            let acc = data.city[first] || {}
-            data.city[first] = acc
-
-            while (rest.length > 1) {
-                prop = rest.shift()
-                acc = acc[prop] = acc[prop] || {}
-            }
-
-            // handle val
-            let last = rest.shift() // really last
-
-            if (['lat', 'lng'].includes(last)) {
-                // acc[last] = +v // TODO: let's make code even more unreadeble!
-                acc[last] = Number.parseFloat(v)
-            } else if (last === '@pcities_population') {
-                acc[last] = Number.parseInt(v)
-            } else {
-                acc[last] = v
-            }
-        } else {
-            data.city[k] = v
-        }
-    }
+    data.city = cities.parse(form)
     present(data, cities.state.render)
 }
 cities.actions.edit = function(ev, present) {
