@@ -33,12 +33,13 @@ users.present = function(data, render) {
     }
 
     if (users.page == 'update') {
-        api.users(users.id).post(users.user, { template: 'sys' })
+        api.users(users.id).post(users.user, { fields: 'features' })
             .then(function(resp) {
                 users.page = 'edit'
+                users.items[users.id] = resp.data
 
                 if (users.user.extra) {
-                    api.users(users.id).extra().post({ data: users.user.extra }, { template: 'sys' }) // TODO: shit
+                    api.users(users.id).extra().post({ data: users.user.extra }, { fields: 'features' }) // TODO: shit
                         .then(function(resp) {
                             users.items[users.id] = resp.data
 
@@ -50,15 +51,14 @@ users.present = function(data, render) {
                         })
                         .catch(function(err) {
                             console.log(err.message)
+
                             users.alert = {
                                 kind: 'danger',
-                                message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+                                message: '<strong>Oops!</strong> Extra is not set. Something went wrong... ¯\\_(ツ)_/¯'
                             }
                             render(users)
                         })
                 } else {
-                    users.items[users.id] = resp.data
-
                     users.alert = {
                         kind: 'success',
                         message: '<strong>Well done!</strong> User updated successfully'
@@ -77,13 +77,14 @@ users.present = function(data, render) {
                 render(users)
             })
     } else if (users.page == 'create') {
-        api.users().post({ login_pass: users.user }, { template: 'sys' })
+        api.users().post({ login_pass: users.user }, { fields: 'features' })
             .then(function(resp) {
                 users.page = 'edit'
                 users.id = resp.data.id
+                users.items[users.id] = resp.data
 
                 if (users.user.extra) {
-                    api.users(users.id).extra().post({ data: users.user.extra }, { template: 'sys' }) // TODO: shit
+                    api.users(users.id).extra().post({ data: users.user.extra }, { fields: 'features' }) // TODO: shit
                         .then(function(resp) {
                             users.items[users.id] = resp.data
 
@@ -95,17 +96,14 @@ users.present = function(data, render) {
                         })
                         .catch(function(err) {
                             console.log(err.message)
-                            users.page = 'new'
 
                             users.alert = {
                                 kind: 'danger',
-                                message: '<strong>Oops!</strong> Something went wrong... ¯\\_(ツ)_/¯'
+                                message: '<strong>Oops!</strong> Extra is not set. Something went wrong... ¯\\_(ツ)_/¯'
                             }
                             render(users)
                         })
                 } else {
-                    users.items[users.id] = resp.data
-
                     users.alert = {
                         kind: 'success',
                         message: '<strong>Well done!</strong> User created successfully'
@@ -128,6 +126,38 @@ users.present = function(data, render) {
         render(users)
     }
 }
+users.parse = function(form) {
+    let user = {}
+
+    for (let [k, v] of new FormData(form).entries()) {
+        if (k.includes('.')) {
+            // TODO: THIS IS GOVNISHE!111
+            // handle keys
+            let [first, ...rest] = k.split('.')
+            let acc = user[first] || {}
+            user[first] = acc
+
+            while (rest.length > 1) {
+                let prop = rest.shift()
+                acc = acc[prop] = acc[prop] || {}
+            }
+
+            // handle val
+            let last = rest.shift() // really last
+
+            if (['celebrity', 'expert'].includes(last)) {
+                acc[last] = eval(v) // HACK: parse string to boolean
+            } else {
+                acc[last] = v
+            }
+        } else {
+            user[k] = v
+        }
+    }
+
+    return user
+}
+
 
 // state
 users.state = {}
@@ -183,8 +213,8 @@ users.views.list = function(model) {
     })
 
     let items = $.map(model.items, function(user, id) {
-        let celebrity = user.extra && user.extra.features && user.extra.features.celebrity
-        let expert = user.extra && user.extra.features && user.extra.features.expert
+        let celebrity = user.features && user.features.celebrity
+        let expert = user.features && user.features.expert
         let el = $(
             `<tr>
                 <td></td>
@@ -330,8 +360,8 @@ users.views.partials.form = function(user) {
             <div class="form-group">
                 <div class="checkbox col-md-8 col-md-offset-2">
                     <label>
-                        <input type="hidden" name="celebrity" value="false"/>
-                        <input type="checkbox" name="celebrity" value="true" ${user.extra && user.extra.features && user.extra.features.celebrity ? "checked" : ""}/>
+                        <input type="hidden" name="extra.features.celebrity" value="false"/>
+                        <input type="checkbox" name="extra.features.celebrity" value="true" ${user.features && user.features.celebrity ? "checked" : ""}/>
                         Celebrity
                     </label>
                 </div>
@@ -339,8 +369,8 @@ users.views.partials.form = function(user) {
             <div class="form-group">
                 <div class="checkbox col-md-8 col-md-offset-2">
                     <label>
-                        <input type="hidden" name="expert" value="false"/>
-                        <input type="checkbox" name="expert" value="true" ${user.extra && user.extra.features && user.extra.features.expert ? "checked" : ""}/>
+                        <input type="hidden" name="extra.features.expert" value="false"/>
+                        <input type="checkbox" name="extra.features.expert" value="true" ${user.features && user.features.expert ? "checked" : ""}/>
                         Expert
                     </label>
                 </div>
@@ -355,34 +385,13 @@ users.views.partials.form = function(user) {
     )
 }
 
-// users.views.partials.pagination = function(pagination) {
-//     let pager = $(
-//         `<nav aria-label="Page navigation">
-//             <ul class="pagination">
-//             </ul>
-//         </nav>`
-//     )
-
-//     let pages = Math.ceil(pagination.total / pagination.per)
-
-//     for (let i = 1; i <= pages; i++) {
-//         let p = $(`<li><a href="#">${i}</a></li>`)
-//         if (i == pagination.current) {
-//             p.addClass('active')
-//         }
-//         pager.find('ul').append(p)
-//     }
-
-//     return pager
-// }
-
 // data = action(event)
 users.actions = {}
 users.actions.list = function(ev, present) {
     let data = {
         page: 'list'
     }
-    api.users().get({ template: 'sys', limit: 9999 }) // filter: 'celebrity', 
+    api.users().get({ limit: 9999, fields: 'features' }) // filter: 'celebrity', 
         .then(function(resp) {
             // NO:
             // data.items = {}
@@ -416,20 +425,11 @@ users.actions.new = function(ev, present) {
 }
 users.actions.create = function(ev, present) {
     let data = {
-        page: 'create',
-        user: {}
+        page: 'create'
     }
     let form = ev.target
-    for (let [k, v] of new FormData(form).entries()) {
-        if (['celebrity', 'expert'].includes(k)) {
-            // TODO: hooooooly shit...
-            data.user.extra = data.user.extra || {}
-            data.user.extra.features = data.user.extra.features || {}
-            data.user.extra.features[k] = v
-        } else {
-            data.user[k] = v
-        }
-    }
+    data.user = users.parse(form)
+
     present(data, users.state.render)
 }
 users.actions.edit = function(ev, present) {
@@ -441,20 +441,10 @@ users.actions.edit = function(ev, present) {
 }
 users.actions.update = function(ev, present) {
     let data = {
-        page: 'update',
-        user: {}
+        page: 'update'
     }
     let form = ev.target
-    for (let [k, v] of new FormData(form).entries()) {
-        if (['celebrity', 'expert'].includes(k)) {
-            // TODO: hooooooly shit...
-            data.user.extra = data.user.extra || {}
-            data.user.extra.features = data.user.extra.features || {}
-            data.user.extra.features[k] = eval(v) // HACK
-        } else {
-            data.user[k] = v
-        }
-    }
+    data.user = users.parse(form)
 
     if (data.user.main_image_file) {
         picserv.upload(data.user.main_image_file)
@@ -464,6 +454,7 @@ users.actions.update = function(ev, present) {
             })
             .catch(function(err) {
                 console.log(err)
+                // TODO
                 present(data, users.state.render)
             })
     } else {
