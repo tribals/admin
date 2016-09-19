@@ -10,6 +10,11 @@ var navbar = {
 			title: 'Users',
 			href: '#users',
 			action: 'list'
+		},
+		cities: {
+			title: 'Cities',
+			href: '#cities',
+			action: 'list'
 		}
 	},
 	active: 'home'
@@ -39,17 +44,15 @@ navbar.view = function(model) {
 	let repr = $(`<ul id="repr-${model.selector}" class="nav navbar-nav"></ul>`)
 
 	let items = $.map(model.items, function(nav, key) {
-		let el = $(`<li><a href="${nav.href}" data-active="${key}">${nav.title}</a></li>`)
+		let el = $(`<li><a href="${nav.href}">${nav.title}</a></li>`)
 
 		if (key == model.active) {
 			el.addClass('active')
 		}
 		el.on('click', function(ev) {
-			if ('action' in nav) {
-				// TODO: holly shit
-				models[key].actions[nav.action](ev, models[key].present)
-			}
-			model.actions.navigateTo(ev, model.present)
+			// TODO: holy shit
+			models[key].actions[nav.action](ev, models[key].present)
+			model.actions.navigateTo(key, model.present)
 		})
 		return el
 	})
@@ -64,8 +67,7 @@ navbar.view.display = function(selector, repr) {
 
 //
 navbar.actions = {}
-navbar.actions.navigateTo = function(ev, present) {
-	let active = $(ev.target).data('active')
+navbar.actions.navigateTo = function(active, present) {
 	present({ active: active }, navbar.state.render)
 }
 

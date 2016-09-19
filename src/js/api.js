@@ -106,7 +106,7 @@ APIError.prototype = Object.create(Error.prototype)
 			let { type, args } = res.error
 			args = args.map(arg => `  ${arg}`).join('\n')
 			let msg = `${type}:\n${args}`
-			throw new APIError(msg, error.stack_trace.join(''))
+			throw new APIError(msg, res.stack_trace.join(''))
 		} else {
 			return res
 		}

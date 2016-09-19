@@ -211,7 +211,7 @@ users.views.new = function(model) {
     let repr = $(
         `<div id="repr-${model.selector}" class="form-horizontal">
             <div class="page-header">
-                <h1>Creating User</h1>
+                <h1>Creating <strong>User</strong></h1>
             </div>
         </div>`
     )
